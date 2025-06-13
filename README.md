@@ -63,4 +63,4 @@ All core systems tested and functional.
 - Implement technology research
 - Add diplomacy features
 - Create victory conditions
-- Add more ship and building types 
+- Add more ship and building types
