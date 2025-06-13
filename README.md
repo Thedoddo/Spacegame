@@ -59,8 +59,28 @@ All core systems tested and functional.
 
 ## Next Development Steps
 
-- Add combat system
-- Implement technology research
-- Add diplomacy features
-- Create victory conditions
-- Add more ship and building types
+### 🚧 In Development (Current Feature Branch)
+- **Combat System** - Ship-to-ship battles, defense turrets, planetary invasion
+
+### 🎯 Planned Features (Priority Order)
+
+#### **High Priority**
+- **Technology Research Tree** - Unlock advanced buildings and ship upgrades
+- **AI Opponent** - Single-player campaign with intelligent computer players
+- **Victory Conditions** - Multiple paths to victory (conquest, economic, science)
+
+#### **Medium Priority** 
+- **Advanced Ship Management** - Fleet grouping, ship production, veterancy system
+- **Diplomacy System** - Trade agreements, alliances, resource trading
+- **Enhanced UI/UX** - Minimap, turn summaries, save/load functionality
+
+#### **Future Expansions**
+- **Orbital Buildings System** - Space-based structures around planets
+  - Orbital Factories for advanced ship production
+  - Research Stations for enhanced science generation  
+  - Communication Arrays for extended sensor range
+  - Defense Platforms for system-wide protection
+  - Trade Hubs for economic bonuses
+  - Requires orbital construction ships and advanced technology
+- **Megastructures** - Late-game massive construction projects
+- **Audio & Visual Polish** - Sound effects, music, particle effects
