@@ -33,15 +33,8 @@ class GameState:
         if (self.galaxy.build_mode and self.galaxy.selected_unit and 
             hasattr(self.galaxy.selected_unit, 'get_allowed_buildings')):
             buildings = self.galaxy.selected_unit.get_allowed_buildings()
-            print(f"DEBUG: Available buildings for planet: {buildings}")
-            print(f"DEBUG: Planet type: {getattr(self.galaxy.selected_unit, 'planet_type', 'Unknown')}")
-            print(f"DEBUG: Build mode: {self.galaxy.build_mode}")
             return buildings
         # If not in planet build mode, show no buildings
-        print(f"DEBUG: No buildings available (build_mode={self.galaxy.build_mode}, selected_unit={self.galaxy.selected_unit})")
-        if self.galaxy.selected_unit:
-            print(f"DEBUG: Selected unit type: {type(self.galaxy.selected_unit)}")
-            print(f"DEBUG: Has get_allowed_buildings: {hasattr(self.galaxy.selected_unit, 'get_allowed_buildings')}")
         return []
 
     def handle_event(self, event):
