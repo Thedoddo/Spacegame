@@ -76,6 +76,33 @@ PLANET_TYPES = {
     'TOXIC': 'Toxic'
 }
 
+# Nebulae types
+NEBULA_TYPES = {
+    'EMISSION': 'Emission Nebula',      # Red/pink - star-forming regions
+    'REFLECTION': 'Reflection Nebula',  # Blue - reflects starlight
+    'PLANETARY': 'Planetary Nebula',    # Green/cyan - dying star remnants
+    'DARK': 'Dark Nebula',             # Purple/black - dense dust clouds
+    'SUPERNOVA': 'Supernova Remnant'   # Orange/yellow - stellar explosion remnants
+}
+
+# Nebula colors (with transparency for cloudy effect)
+NEBULA_COLORS = {
+    'EMISSION': (255, 100, 150, 80),      # Pink/red with transparency
+    'REFLECTION': (100, 150, 255, 80),    # Blue with transparency
+    'PLANETARY': (100, 255, 200, 80),     # Cyan/green with transparency
+    'DARK': (80, 50, 120, 100),          # Dark purple with more opacity
+    'SUPERNOVA': (255, 200, 100, 90)     # Orange/yellow with transparency
+}
+
+# Nebula effects on gameplay
+NEBULA_EFFECTS = {
+    'EMISSION': {'science_bonus': 2, 'movement_penalty': 0},      # Science bonus from stellar formation
+    'REFLECTION': {'energy_bonus': 1, 'movement_penalty': 1},     # Energy from reflected light, slight movement penalty
+    'PLANETARY': {'science_bonus': 3, 'movement_penalty': 1},     # High science from exotic matter
+    'DARK': {'stealth_bonus': True, 'movement_penalty': 2},       # Ships harder to detect, significant movement penalty
+    'SUPERNOVA': {'energy_bonus': 3, 'damage_risk': True}        # High energy but potential ship damage
+}
+
 # Building costs
 BUILDING_COSTS = {
     BUILDING_TYPES['POWER_PLANT']: {

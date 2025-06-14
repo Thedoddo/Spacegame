@@ -15,11 +15,43 @@ PLANET_TYPES = {
 }
 
 SUN_TYPES = {
+    # Original stars
     'RED_DWARF': {'label': 'RD', 'color': (255, 80, 80), 'size': 5},
     'YELLOW_STAR': {'label': 'YS', 'color': (255, 215, 0), 'size': 9},
     'BLUE_GIANT': {'label': 'BG', 'color': (80, 160, 255), 'size': 13},
     'WHITE_DWARF': {'label': 'WD', 'color': (240, 240, 255), 'size': 3},
     'NEUTRON_STAR': {'label': 'NS', 'color': (180, 180, 255), 'size': 2},
+    
+    # Expanded star types
+    'RED_GIANT': {'label': 'RG', 'color': (255, 120, 60), 'size': 16},      # Massive, dying red star
+    'ORANGE_STAR': {'label': 'OS', 'color': (255, 165, 0), 'size': 7},      # K-type main sequence star
+    'BLUE_SUPERGIANT': {'label': 'BS', 'color': (100, 200, 255), 'size': 20}, # Extremely massive blue star
+    'BROWN_DWARF': {'label': 'BD', 'color': (139, 69, 19), 'size': 4},      # Failed star, dim brown
+    'VARIABLE_STAR': {'label': 'VS', 'color': (255, 100, 255), 'size': 8},  # Pulsating star, magenta
+    'CARBON_STAR': {'label': 'CS', 'color': (200, 50, 50), 'size': 11},     # Carbon-rich red star
+    'WOLF_RAYET': {'label': 'WR', 'color': (255, 255, 150), 'size': 6},     # Hot, luminous star
+    'T_TAURI': {'label': 'TT', 'color': (255, 200, 100), 'size': 6},        # Young, pre-main sequence star
+    
+    # Exotic stellar objects
+    'BINARY_STAR': {'label': 'BI', 'color': (255, 150, 100), 'size': 12},   # Two stars orbiting each other
+    'TRIPLE_STAR': {'label': 'TR', 'color': (200, 150, 255), 'size': 15},   # Three-star system
+    'MAGNETAR': {'label': 'MG', 'color': (100, 200, 255), 'size': 2},       # Ultra-magnetic neutron star
+    'QUASAR': {'label': 'QS', 'color': (255, 255, 255), 'size': 8},         # Supermassive object with energy jets
+    'DARK_STAR': {'label': 'DS', 'color': (40, 40, 60), 'size': 7},         # Theoretical dark matter star
+    'HYPERGIANT': {'label': 'HG', 'color': (255, 100, 0), 'size': 25},      # Largest possible star
+    'PREON_STAR': {'label': 'PR', 'color': (200, 220, 255), 'size': 1},     # Theoretical ultra-dense star
+    'HELIUM_STAR': {'label': 'HE', 'color': (255, 255, 200), 'size': 4},    # Pure helium burning star
+    'OXYGEN_STAR': {'label': 'OX', 'color': (200, 255, 200), 'size': 5},    # Oxygen-burning stellar remnant
+    
+    # Ultra-exotic stellar objects
+    'QUASI_STAR': {'label': 'QU', 'color': (255, 50, 255), 'size': 30},     # Hypothetical supermassive early universe star
+    'BOSON_STAR': {'label': 'BO', 'color': (150, 255, 150), 'size': 6},     # Theoretical exotic matter star
+    'STRANGE_STAR': {'label': 'ST', 'color': (255, 100, 200), 'size': 3},   # Strange quark matter star
+    'ELECTROWEAK_STAR': {'label': 'EW', 'color': (100, 255, 255), 'size': 4}, # Theoretical electroweak matter star
+    'PLANCK_STAR': {'label': 'PL', 'color': (255, 255, 100), 'size': 1},    # Quantum gravity effects star
+    'FUZZBALL': {'label': 'FB', 'color': (200, 100, 255), 'size': 5},       # String theory alternative to black holes
+    'GRAVASTARS': {'label': 'GR', 'color': (100, 100, 255), 'size': 4},     # Gravitational vacuum condensate stars
+    'Q_STAR': {'label': 'Q*', 'color': (255, 200, 255), 'size': 2},         # Theoretical ultra-compact object
 }
 
 class Planet(Unit):
@@ -47,8 +79,15 @@ class Planet(Unit):
         return self.color
 
     def render(self, screen, offset_x, offset_y, zoom_level=1.0):
-        scaled_grid_size = round(GRID_SIZE * zoom_level)
-        scaled_size = max(10, int(self.size * scaled_grid_size))
+        scaled_grid_size = max(1, round(GRID_SIZE * zoom_level))
+        
+        # Ensure planets are always visible with minimum size based on zoom level
+        if zoom_level <= 0.05:
+            # At extreme zoom out, use a larger minimum size
+            scaled_size = max(4, int(self.size * 1.5))  # Smaller than stars but still visible
+        else:
+            scaled_size = max(4, int(self.size * scaled_grid_size))
+        
         px = self.grid_position[0] * scaled_grid_size + offset_x
         py = self.grid_position[1] * scaled_grid_size + offset_y
         rect = pygame.Rect(px, py, scaled_size, scaled_size)
@@ -56,8 +95,11 @@ class Planet(Unit):
         pygame.draw.rect(screen, self.color, rect)
         # Draw darker border for all planets
         border_color = tuple(max(0, c - 60) for c in self.color)
-        pygame.draw.rect(screen, border_color, rect, max(2, scaled_size // 10))
-        # Draw buildings on the grid (colored by type, always visible)
+        pygame.draw.rect(screen, border_color, rect, max(1, scaled_size // 10))
+        
+        # Only draw buildings when zoomed in enough to see them
+        if zoom_level > 0.25 and scaled_grid_size > 8:
+            # Draw buildings on the grid (colored by type)
         from .constants import BUILDING_COLORS
         for gy in range(self.size):
             for gx in range(self.size):
@@ -69,9 +111,18 @@ class Planet(Unit):
                     cell_y = (self.grid_position[1] + gy) * scaled_grid_size + offset_y
                     rect = pygame.Rect(cell_x, cell_y, scaled_grid_size, scaled_grid_size)
                     pygame.draw.rect(screen, color, rect.inflate(-scaled_grid_size//3, -scaled_grid_size//3))
-        # Draw label always on top of buildings
-        if self.system_label:
-            font = pygame.font.Font(None, max(14, scaled_size // 2))
+        elif zoom_level > 0.1:
+            # When moderately zoomed out, just show a dot if planet has any buildings
+            has_buildings = any(cell is not None for row in self.planet_grid for cell in row)
+            if has_buildings:
+                center_x = px + scaled_size // 2
+                center_y = py + scaled_size // 2
+                pygame.draw.circle(screen, (255, 255, 0), (center_x, center_y), max(2, scaled_size // 8))
+        
+        # Draw label when zoomed in enough to read it
+        if self.system_label and zoom_level > 0.2:
+            font_size = max(12, min(24, scaled_size // 2))
+            font = pygame.font.Font(None, font_size)
             label_text = font.render(f"{self.system_label}-{self.type_label}", True, (255, 255, 255))
             screen.blit(label_text, (px + 2, py + 2))
 
@@ -242,18 +293,72 @@ class Sun(Planet):
         self.sun_type_name = sun_type.replace('_', ' ').title()
 
     def render(self, screen, offset_x, offset_y, zoom_level=1.0):
-        scaled_grid_size = round(GRID_SIZE * zoom_level)
-        scaled_size = max(10, int(self.size * scaled_grid_size))
+        scaled_grid_size = max(1, round(GRID_SIZE * zoom_level))
+        
+        # Ensure stars are always visible with minimum size based on zoom level
+        if zoom_level <= 0.05:
+            # At extreme zoom out, use a larger minimum size
+            scaled_size = max(8, int(self.size * 2))  # Larger minimum for extreme zoom
+        else:
+            scaled_size = max(6, int(self.size * scaled_grid_size))
+        
         px = self.grid_position[0] * scaled_grid_size + offset_x
         py = self.grid_position[1] * scaled_grid_size + offset_y
+        
+        # Special rendering for multi-star systems
+        if self.sun_type == 'BINARY_STAR':
+            # Draw two overlapping stars for binary system
+            star_size = max(4, scaled_size // 2)
+            offset = max(2, scaled_size // 4)
+            
+            # First star (slightly left and up)
+            rect1 = pygame.Rect(px - offset, py - offset, star_size, star_size)
+            pygame.draw.rect(screen, self.color, rect1)
+            border_color = tuple(max(0, c - 60) for c in self.color)
+            pygame.draw.rect(screen, border_color, rect1, max(1, star_size // 8))
+            
+            # Second star (slightly right and down) - slightly different color
+            second_color = tuple(min(255, c + 30) for c in self.color)
+            rect2 = pygame.Rect(px + offset, py + offset, star_size, star_size)
+            pygame.draw.rect(screen, second_color, rect2)
+            border_color2 = tuple(max(0, c - 60) for c in second_color)
+            pygame.draw.rect(screen, border_color2, rect2, max(1, star_size // 8))
+            
+        elif self.sun_type == 'TRIPLE_STAR':
+            # Draw three stars in a triangle formation
+            star_size = max(3, scaled_size // 3)
+            offset = max(2, scaled_size // 4)
+            
+            # First star (center-left)
+            rect1 = pygame.Rect(px - offset, py, star_size, star_size)
+            pygame.draw.rect(screen, self.color, rect1)
+            
+            # Second star (top-right)
+            second_color = tuple(min(255, c + 20) for c in self.color)
+            rect2 = pygame.Rect(px + offset//2, py - offset, star_size, star_size)
+            pygame.draw.rect(screen, second_color, rect2)
+            
+            # Third star (bottom-right)
+            third_color = tuple(max(0, c - 20) for c in self.color)
+            rect3 = pygame.Rect(px + offset//2, py + offset, star_size, star_size)
+            pygame.draw.rect(screen, third_color, rect3)
+            
+            # Draw borders for all three
+            border_color = tuple(max(0, c - 60) for c in self.color)
+            pygame.draw.rect(screen, border_color, rect1, max(1, star_size // 8))
+            pygame.draw.rect(screen, border_color, rect2, max(1, star_size // 8))
+            pygame.draw.rect(screen, border_color, rect3, max(1, star_size // 8))
+            
+        else:
+            # Draw single star normally
         rect = pygame.Rect(px, py, scaled_size, scaled_size)
-        # Draw main square
         pygame.draw.rect(screen, self.color, rect)
-        # Draw darker border for all suns
         border_color = tuple(max(0, c - 60) for c in self.color)
-        pygame.draw.rect(screen, border_color, rect, max(2, scaled_size // 10))
-        # Draw label
-        font = pygame.font.Font(None, max(14, scaled_size // 2))
+            pygame.draw.rect(screen, border_color, rect, max(1, scaled_size // 10))
+        
+        # Only draw label when zoomed in enough to read it
+        if zoom_level > 0.1:
+            font = pygame.font.Font(None, max(12, scaled_size // 2))
         label_text = font.render(f"{self.system_label}-{self.type_label}", True, (255, 255, 255))
         screen.blit(label_text, (px + 2, py + 2))
 
