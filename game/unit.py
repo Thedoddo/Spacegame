@@ -85,10 +85,12 @@ class Unit:
             height
         )
         # Clamp tooltip to screen
-        if tooltip_rect.right > WINDOW_WIDTH:
-            tooltip_rect.x = max(0, WINDOW_WIDTH - tooltip_rect.width - 8)
-        if tooltip_rect.bottom > WINDOW_HEIGHT:
-            tooltip_rect.y = max(0, WINDOW_HEIGHT - tooltip_rect.height - 8)
+        screen_width = screen.get_width()
+        screen_height = screen.get_height()
+        if tooltip_rect.right > screen_width:
+            tooltip_rect.x = max(0, screen_width - tooltip_rect.width - 8)
+        if tooltip_rect.bottom > screen_height:
+            tooltip_rect.y = max(0, screen_height - tooltip_rect.height - 8)
         pygame.draw.rect(screen, (30, 30, 30), tooltip_rect)
         pygame.draw.rect(screen, WHITE, tooltip_rect, 1)
         for i, line in enumerate(lines):
@@ -135,10 +137,12 @@ class Ship(Unit):
             height
         )
         # Clamp tooltip to screen
-        if tooltip_rect.right > WINDOW_WIDTH:
-            tooltip_rect.x = max(0, WINDOW_WIDTH - tooltip_rect.width - 8)
-        if tooltip_rect.bottom > WINDOW_HEIGHT:
-            tooltip_rect.y = max(0, WINDOW_HEIGHT - tooltip_rect.height - 8)
+        screen_width = screen.get_width()
+        screen_height = screen.get_height()
+        if tooltip_rect.right > screen_width:
+            tooltip_rect.x = max(0, screen_width - tooltip_rect.width - 8)
+        if tooltip_rect.bottom > screen_height:
+            tooltip_rect.y = max(0, screen_height - tooltip_rect.height - 8)
         pygame.draw.rect(screen, (30, 30, 30), tooltip_rect)
         pygame.draw.rect(screen, WHITE, tooltip_rect, 1)
         for i, line in enumerate(lines):

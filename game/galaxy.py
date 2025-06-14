@@ -3,6 +3,7 @@ import numpy as np
 from .constants import *
 from .planet import Planet, Sun, PLANET_TYPES, SUN_TYPES
 from .unit import Ship, Frigate, Destroyer, Cruiser, Battleship, Carrier, Fighter, Bomber, BuilderShip, Corvette
+from .nebula import Nebula
 
 class Galaxy:
     def __init__(self):
@@ -16,6 +17,7 @@ class Galaxy:
         self.last_mouse_pos = None
         self.planets = []  # List of all planets
         self.asteroids = []  # List of all asteroids
+        self.nebulae = []  # List of all nebulae
 
         self.pan_speed = 20  # Speed for panning
         self.zoom_level = 1.0  # Initial zoom level
@@ -24,6 +26,7 @@ class Galaxy:
         self.building_just_placed = False  # Track if a building was just placed
         self.generate_planets()
         self.generate_asteroids()
+        self.generate_nebulae()
         self.spawn_ship()
 
     def is_space_free(self, x, y, size):
@@ -54,13 +57,24 @@ class Galaxy:
             self.planets.append(sun)
             sun_positions.append((spawn_x, spawn_y))
             print(f"Star ({system_label}-{sun_type}) placed at: ({spawn_x}, {spawn_y})")
-            # Generate planets around the sun
-            num_planets = np.random.randint(3, 6)
+            
+            # Generate planets around the sun - GUARANTEE one volcanic or rocky planet
+            num_planets = np.random.randint(4, 8)  # More planets per system
+            has_mining_planet = False
+            
             for planet_num in range(num_planets):
                 for attempt in range(30):
                     angle = np.random.uniform(0, 2 * np.pi)
                     distance = np.random.randint(10, 20)
-                    planet_type = list(PLANET_TYPES.keys())[np.random.randint(0, len(PLANET_TYPES))]
+                    
+                    # For the first planet in starting systems, guarantee volcanic or rocky
+                    if planet_num == 0 and not has_mining_planet:
+                        planet_type = np.random.choice(['VOLCANIC', 'ROCKY'])
+                        has_mining_planet = True
+                        print(f"  Guaranteed {planet_type} planet for starting system {system_label}")
+                    else:
+                        planet_type = list(PLANET_TYPES.keys())[np.random.randint(0, len(PLANET_TYPES))]
+                    
                     planet_size = np.random.randint(2, 7)
                     x = int(spawn_x + distance * np.cos(angle))
                     y = int(spawn_y + distance * np.sin(angle))
@@ -71,8 +85,8 @@ class Galaxy:
             system_index += 1
 
         # Randomly generate the rest of the systems
-        num_systems = np.random.randint(3, 9)  # Adjust as needed
-        min_distance = 100  # Minimum distance between suns
+        num_systems = np.random.randint(8, 15)  # More systems for denser galaxy
+        min_distance = 80  # Reduced minimum distance for denser systems
         for _ in range(num_systems):
             for attempt in range(100):  # Try up to 100 times to find a valid position
                 sun_x = np.random.randint(0, GALAXY_SIZE - 9)
@@ -92,7 +106,7 @@ class Galaxy:
                     sun_positions.append((sun_x, sun_y))
                     print(f"Star ({system_label}-{sun_type}) placed at: ({sun_x}, {sun_y})")
                     # Generate planets around the sun
-                    num_planets = np.random.randint(3, 6)
+                    num_planets = np.random.randint(4, 8)  # More planets per system
                     for planet_num in range(num_planets):
                         for attempt in range(30):
                             angle = np.random.uniform(0, 2 * np.pi)
@@ -116,8 +130,8 @@ class Galaxy:
         import random
         self.asteroids.clear()
         
-        # Generate 25-40 asteroid field patches (even more patches)
-        num_asteroid_patches = random.randint(25, 40)
+        # Generate 40-60 asteroid field patches (much denser)
+        num_asteroid_patches = random.randint(40, 60)
         
         for patch_num in range(num_asteroid_patches):
             # Find a center point for this patch
@@ -139,8 +153,8 @@ class Galaxy:
                     patch_shapes = ['cluster', 'line', 'ring', 'scattered', 'dense_core', 'spiral']
                     patch_shape = random.choice(patch_shapes)
                     
-                    # Create different shaped patches with 40-80 asteroids
-                    asteroids_in_patch = random.randint(40, 80)
+                    # Create different shaped patches with 60-120 asteroids
+                    asteroids_in_patch = random.randint(60, 120)
                     patch_radius = random.randint(12, 20)
                     
                     if patch_shape == 'cluster':
@@ -304,6 +318,51 @@ class Galaxy:
         
         print(f"Generated {len(self.asteroids)} total asteroids in {num_asteroid_patches} patches")
 
+    def generate_nebulae(self):
+        """Generate nebulae scattered throughout the galaxy"""
+        import random
+        self.nebulae.clear()
+        
+        # Generate 8-15 nebulae across the galaxy (much denser)
+        num_nebulae = random.randint(8, 15)
+        
+        for nebula_num in range(num_nebulae):
+            # Find a position for this nebula
+            for attempt in range(50):  # Try up to 50 times to find a valid position
+                center_x = random.randint(30, GALAXY_SIZE - 30)
+                center_y = random.randint(30, GALAXY_SIZE - 30)
+                nebula_size = random.randint(12, 25)  # Radius in grid units
+                
+                # Check if nebula is far enough from planets and suns
+                too_close = False
+                for planet in self.planets:
+                    px, py = planet.grid_position
+                    distance = ((center_x - px) ** 2 + (center_y - py) ** 2) ** 0.5
+                    if distance < nebula_size + 15:  # Keep nebulae away from systems
+                        too_close = True
+                        break
+                
+                # Check distance from other nebulae
+                for existing_nebula in self.nebulae:
+                    nx, ny = existing_nebula.center_position
+                    distance = ((center_x - nx) ** 2 + (center_y - ny) ** 2) ** 0.5
+                    if distance < nebula_size + existing_nebula.size + 5:  # Allow closer nebulae
+                        too_close = True
+                        break
+                
+                if not too_close:
+                    # Choose a random nebula type
+                    nebula_type = random.choice(list(NEBULA_TYPES.keys()))
+                    
+                    # Create the nebula
+                    nebula = Nebula(nebula_type, (center_x, center_y), nebula_size)
+                    self.nebulae.append(nebula)
+                    
+                    print(f"Generated {nebula.name} at ({center_x}, {center_y}) with size {nebula_size}")
+                    break
+        
+        print(f"Generated {len(self.nebulae)} total nebulae")
+
     def spawn_ship(self):
         self.ships.clear()
         # Player 1 ships
@@ -322,7 +381,7 @@ class Galaxy:
     def handle_click(self, pos, current_player):
         from .constants import GRID_SIZE
         self.building_just_placed = False  # Reset flag at start of each click
-        scaled_grid_size = round(GRID_SIZE * self.zoom_level)
+        scaled_grid_size = max(1, round(GRID_SIZE * self.zoom_level))  # Prevent division by zero
         grid_x = (pos[0] - self.offset_x) // scaled_grid_size
         grid_y = (pos[1] - self.offset_y) // scaled_grid_size
         selected_building_type = getattr(self, 'selected_building_type', None)
@@ -550,22 +609,63 @@ class Galaxy:
             self.offset_y += dy
             self.last_mouse_pos = pos
 
-    def handle_zoom(self, zoom_in):
-        from .constants import WINDOW_WIDTH, WINDOW_HEIGHT
-        # Calculate world coordinates at the center of the screen before zoom
-        center_screen_x = WINDOW_WIDTH // 2
-        center_screen_y = WINDOW_HEIGHT // 2
-        world_x = (center_screen_x - self.offset_x) / (GRID_SIZE * self.zoom_level)
-        world_y = (center_screen_y - self.offset_y) / (GRID_SIZE * self.zoom_level)
-        # Change zoom level
+    def handle_zoom(self, zoom_in, screen=None):
+        # Get screen dimensions dynamically
+        if screen:
+            screen_width = screen.get_width()
+            screen_height = screen.get_height()
+        else:
+            from .constants import WINDOW_WIDTH, WINDOW_HEIGHT
+            screen_width = WINDOW_WIDTH
+            screen_height = WINDOW_HEIGHT
+        
+        # Change zoom level first
         old_zoom = self.zoom_level
         if zoom_in:
-            self.zoom_level = max(0.05, self.zoom_level - 0.1)  # Zoom out
+            self.zoom_level = max(0.01, self.zoom_level - 0.1)  # Zoom out much further
         else:
             self.zoom_level = min(2.0, self.zoom_level + 0.1)  # Zoom in
-        # Adjust offset to keep the same world point at the center
-        self.offset_x = center_screen_x - int(world_x * GRID_SIZE * self.zoom_level)
-        self.offset_y = center_screen_y - int(world_y * GRID_SIZE * self.zoom_level)
+        
+        # If zooming from extreme zoom back to normal, reset to galaxy center
+        if old_zoom <= 0.05 and self.zoom_level > 0.05:
+            # Reset view to center of galaxy when coming back from extreme zoom
+            self.center_view_on_galaxy(screen)
+        else:
+            # Normal zoom behavior - try to maintain center point
+            center_screen_x = screen_width // 2
+            center_screen_y = screen_height // 2
+            
+            # Prevent division by extremely small numbers
+            safe_zoom = max(0.001, old_zoom)
+            world_x = (center_screen_x - self.offset_x) / (GRID_SIZE * safe_zoom)
+            world_y = (center_screen_y - self.offset_y) / (GRID_SIZE * safe_zoom)
+            
+            # Adjust offset to keep the same world point at the center
+            new_offset_x = center_screen_x - (world_x * GRID_SIZE * self.zoom_level)
+            new_offset_y = center_screen_y - (world_y * GRID_SIZE * self.zoom_level)
+            
+            # Clamp offsets to reasonable bounds
+            max_offset = GALAXY_SIZE * GRID_SIZE
+            self.offset_x = max(-max_offset, min(max_offset, new_offset_x))
+            self.offset_y = max(-max_offset, min(max_offset, new_offset_y))
+    
+    def center_view_on_galaxy(self, screen=None):
+        """Center the view on the galaxy"""
+        # Get screen dimensions dynamically
+        if screen:
+            screen_width = screen.get_width()
+            screen_height = screen.get_height()
+        else:
+            from .constants import WINDOW_WIDTH, WINDOW_HEIGHT
+            screen_width = WINDOW_WIDTH
+            screen_height = WINDOW_HEIGHT
+            
+        galaxy_center_x = GALAXY_SIZE // 2
+        galaxy_center_y = GALAXY_SIZE // 2
+        
+        # Center the view on the galaxy center
+        self.offset_x = (screen_width // 2) - (galaxy_center_x * GRID_SIZE * self.zoom_level)
+        self.offset_y = (screen_height // 2) - (galaxy_center_y * GRID_SIZE * self.zoom_level)
 
     def draw(self, screen):
         # Draw grid
@@ -621,38 +721,114 @@ class Galaxy:
             self.handle_pan(0, 1)
         if keys[pygame.K_DOWN] or keys[pygame.K_s]:
             self.handle_pan(0, -1)
+        if keys[pygame.K_HOME] or keys[pygame.K_c]:
+            # Press HOME or C to center view on galaxy
+            self.center_view_on_galaxy()
 
     def render(self, screen):
-        # Calculate visible grid range
-        from .constants import WINDOW_WIDTH, WINDOW_HEIGHT
-        scaled_grid_size = round(GRID_SIZE * self.zoom_level)
-        start_x = max(0, (-self.offset_x) // scaled_grid_size)
-        end_x = min(GALAXY_SIZE, (WINDOW_WIDTH - self.offset_x) // scaled_grid_size + 2)
-        start_y = max(0, (-self.offset_y) // scaled_grid_size)
-        end_y = min(GALAXY_SIZE, (WINDOW_HEIGHT - self.offset_y) // scaled_grid_size + 2)
+        # Calculate visible grid range using dynamic screen dimensions
+        screen_width = screen.get_width()
+        screen_height = screen.get_height()
+        scaled_grid_size = max(1, round(GRID_SIZE * self.zoom_level))  # Prevent division by zero
+        
+        # Use more robust bounds calculation for extreme zoom levels
+        if self.zoom_level <= 0.05:
+            # At extreme zoom, show everything to prevent disappearing objects
+            start_x = 0
+            end_x = GALAXY_SIZE
+            start_y = 0
+            end_y = GALAXY_SIZE
+        else:
+            # Normal visibility culling using dynamic screen dimensions
+            start_x = max(0, int((-self.offset_x) // scaled_grid_size - 10))  # Add buffer
+            end_x = min(GALAXY_SIZE, int((screen_width - self.offset_x) // scaled_grid_size + 10))
+            start_y = max(0, int((-self.offset_y) // scaled_grid_size - 10))
+            end_y = min(GALAXY_SIZE, int((screen_height - self.offset_y) // scaled_grid_size + 10))
 
-        # Draw grid (only visible cells)
-        for x in range(start_x, end_x):
-            for y in range(start_y, end_y):
-                rect = pygame.Rect(x * scaled_grid_size + self.offset_x, y * scaled_grid_size + self.offset_y, scaled_grid_size, scaled_grid_size)
-                pygame.draw.rect(screen, (50, 50, 50), rect, 1)
+        # Optimize grid drawing based on zoom level
+        if self.zoom_level > 0.3:
+            # Draw detailed grid when zoomed in
+            for x in range(start_x, end_x):
+                for y in range(start_y, end_y):
+                    rect = pygame.Rect(x * scaled_grid_size + self.offset_x, y * scaled_grid_size + self.offset_y, scaled_grid_size, scaled_grid_size)
+                    pygame.draw.rect(screen, (50, 50, 50), rect, 1)
+        elif self.zoom_level > 0.1:
+            # Draw sparse grid when moderately zoomed out
+            grid_interval = 5
+            for x in range(start_x, end_x, grid_interval):
+                for y in range(start_y, end_y, grid_interval):
+                    rect = pygame.Rect(x * scaled_grid_size + self.offset_x, y * scaled_grid_size + self.offset_y, scaled_grid_size * grid_interval, scaled_grid_size * grid_interval)
+                    pygame.draw.rect(screen, (30, 30, 30), rect, 1)
+        elif self.zoom_level > 0.02:
+            # Draw major grid every 50 units when zoomed out
+            grid_interval = 50
+            # Align to 50-unit boundaries
+            start_x_major = (start_x // grid_interval) * grid_interval
+            start_y_major = (start_y // grid_interval) * grid_interval
+            for x in range(start_x_major, end_x + grid_interval, grid_interval):
+                for y in range(start_y_major, end_y + grid_interval, grid_interval):
+                    rect = pygame.Rect(x * scaled_grid_size + self.offset_x, y * scaled_grid_size + self.offset_y, 
+                                     scaled_grid_size * grid_interval, scaled_grid_size * grid_interval)
+                    pygame.draw.rect(screen, (70, 70, 70), rect, max(1, int(2 * self.zoom_level / 0.02)))
+        elif self.zoom_level > 0.01:
+            # Draw ultra-major grid every 100 units when extremely zoomed out
+            grid_interval = 100
+            start_x_major = (start_x // grid_interval) * grid_interval
+            start_y_major = (start_y // grid_interval) * grid_interval
+            for x in range(start_x_major, end_x + grid_interval, grid_interval):
+                for y in range(start_y_major, end_y + grid_interval, grid_interval):
+                    rect = pygame.Rect(x * scaled_grid_size + self.offset_x, y * scaled_grid_size + self.offset_y, 
+                                     scaled_grid_size * grid_interval, scaled_grid_size * grid_interval)
+                    pygame.draw.rect(screen, (90, 90, 90), rect, max(1, int(3 * self.zoom_level / 0.01)))
+        # Skip grid entirely when extremely zoomed out (zoom_level <= 0.01)
 
         # Draw coordinate labels if zoomed out
         if self.zoom_level <= 0.4:
-            font_size = 28 if self.zoom_level <= 0.2 else 22
-            font = pygame.font.Font(None, font_size)
-            label_interval = 50 if self.zoom_level <= 0.2 else 10
+            if self.zoom_level <= 0.05:
+                # When extremely zoomed out, show labels every 100 units
+                font_size = max(12, int(24 * self.zoom_level / 0.01))
+                font = pygame.font.Font(None, font_size)
+                label_interval = 100
+                # Align labels to 100-unit boundaries
+                start_x_label = (start_x // label_interval) * label_interval
+                start_y_label = (start_y // label_interval) * label_interval
+            elif self.zoom_level <= 0.1:
+                # When fully zoomed out, show labels every 50 units
+                font_size = max(16, int(32 * self.zoom_level / 0.05))
+                font = pygame.font.Font(None, font_size)
+                label_interval = 50
+                # Align labels to 50-unit boundaries
+                start_x_label = (start_x // label_interval) * label_interval
+                start_y_label = (start_y // label_interval) * label_interval
+            elif self.zoom_level <= 0.2:
+                font_size = 28
+                font = pygame.font.Font(None, font_size)
+                label_interval = 50
+                start_x_label = start_x
+                start_y_label = start_y
+            else:
+                font_size = 22
+                font = pygame.font.Font(None, font_size)
+                label_interval = 10
+                start_x_label = start_x
+                start_y_label = start_y
 
             # Top edge (x labels)
-            for x in range(start_x, end_x, label_interval):
-                label = font.render(str(x), True, (200, 200, 200))
-                px = x * scaled_grid_size + self.offset_x
-                screen.blit(label, (px + 2, 2))
+            for x in range(start_x_label, end_x + label_interval, label_interval):
+                if x >= 0:  # Don't show negative coordinates
+                    label = font.render(str(x), True, (200, 200, 200))
+                    px = x * scaled_grid_size + self.offset_x
+                    screen_width = screen.get_width()
+                    if px >= 0 and px < screen_width - 50:  # Only show if on screen
+                        screen.blit(label, (px + 2, 2))
             # Left edge (y labels)
-            for y in range(start_y, end_y, label_interval):
-                label = font.render(str(y), True, (200, 200, 200))
-                py = y * scaled_grid_size + self.offset_y
-                screen.blit(label, (2, py + 2))
+            for y in range(start_y_label, end_y + label_interval, label_interval):
+                if y >= 0:  # Don't show negative coordinates
+                    label = font.render(str(y), True, (200, 200, 200))
+                    py = y * scaled_grid_size + self.offset_y
+                    screen_height = screen.get_height()
+                    if py >= 0 and py < screen_height - 30:  # Only show if on screen
+                        screen.blit(label, (2, py + 2))
 
         # Draw move range tiles (only if visible)
         for tile in self.move_tiles:
@@ -662,31 +838,35 @@ class Galaxy:
                 pygame.draw.rect(screen, (100, 150, 255), rect)  # Solid blue highlight
                 pygame.draw.rect(screen, (0, 100, 255), rect, 3)  # Blue border
         
-        # Draw planets (only if visible)
+        # Draw planets (only if visible, optimized for zoom level)
         for planet in self.planets:
             px, py = planet.grid_position
             if (px + planet.size > start_x and px < end_x and
                 py + planet.size > start_y and py < end_y):
                 planet.render(screen, self.offset_x, self.offset_y, self.zoom_level)
-                # Always show tooltip if selected or in build mode
-                if ((getattr(planet, 'selected', False) or self.build_mode) and hasattr(planet, 'render_tooltip')):
-                    # Tooltip always to the right of the planet grid
-                    scaled_grid_size = round(GRID_SIZE * self.zoom_level)
-                    tooltip_offset_x = (planet.grid_position[0] + planet.size) * scaled_grid_size + self.offset_x + 8
-                    tooltip_offset_y = planet.grid_position[1] * scaled_grid_size + self.offset_y
-                    planet.render_tooltip(screen, tooltip_offset_x, tooltip_offset_y)
-                # Draw grid overlay if selected and not a sun
-                if getattr(planet, 'selected', False) and getattr(planet, 'planet_type', None) != 'SUN':
-                    scaled_grid_size = round(GRID_SIZE * self.zoom_level)
-                    for gx in range(planet.size):
-                        for gy in range(planet.size):
-                            cell_x = (planet.grid_position[0] + gx) * scaled_grid_size + self.offset_x
-                            cell_y = (planet.grid_position[1] + gy) * scaled_grid_size + self.offset_y
-                            rect = pygame.Rect(cell_x, cell_y, scaled_grid_size, scaled_grid_size)
-                            pygame.draw.rect(screen, (0, 255, 0), rect, 2)
-                            # Draw building icon if present
-                            if planet.planet_grid[gy][gx] is not None:
-                                pygame.draw.rect(screen, (0, 120, 255), rect.inflate(-scaled_grid_size//3, -scaled_grid_size//3))
+                
+                # Only show detailed UI elements when zoomed in enough
+                if self.zoom_level > 0.3:
+                    # Only show tooltip if planet is specifically selected (not just in build mode)
+                    if (getattr(planet, 'selected', False) and hasattr(planet, 'render_tooltip')):
+                        # Tooltip always to the right of the planet grid
+                        scaled_grid_size = round(GRID_SIZE * self.zoom_level)
+                        tooltip_offset_x = (planet.grid_position[0] + planet.size) * scaled_grid_size + self.offset_x + 8
+                        tooltip_offset_y = planet.grid_position[1] * scaled_grid_size + self.offset_y
+                        planet.render_tooltip(screen, tooltip_offset_x, tooltip_offset_y)
+                    
+                    # Draw grid overlay if selected and not a sun
+                    if getattr(planet, 'selected', False) and getattr(planet, 'planet_type', None) != 'SUN':
+                        scaled_grid_size = round(GRID_SIZE * self.zoom_level)
+                        for gx in range(planet.size):
+                            for gy in range(planet.size):
+                                cell_x = (planet.grid_position[0] + gx) * scaled_grid_size + self.offset_x
+                                cell_y = (planet.grid_position[1] + gy) * scaled_grid_size + self.offset_y
+                                rect = pygame.Rect(cell_x, cell_y, scaled_grid_size, scaled_grid_size)
+                                pygame.draw.rect(screen, (0, 255, 0), rect, 2)
+                                # Draw building icon if present
+                                if planet.planet_grid[gy][gx] is not None:
+                                    pygame.draw.rect(screen, (0, 120, 255), rect.inflate(-scaled_grid_size//3, -scaled_grid_size//3))
         
         # Draw ships (only if visible)
         for ship in self.ships:
@@ -694,14 +874,47 @@ class Galaxy:
             if (start_x <= sx < end_x and start_y <= sy < end_y):
                 ship.render(screen, self.offset_x, self.offset_y, self.zoom_level)
         
-        # Draw asteroids (only if visible)
+        # Draw nebulae (in background, only if visible, optimized for zoom level)
+        if self.zoom_level > 0.15:
+            # Draw detailed nebulae when zoomed in enough
+            for nebula in self.nebulae:
+                nx, ny = nebula.center_position
+                nebula_size = nebula.size
+                if (nx + nebula_size > start_x and nx - nebula_size < end_x and
+                    ny + nebula_size > start_y and ny - nebula_size < end_y):
+                    nebula.draw(screen, self.offset_x, self.offset_y, self.zoom_level)
+        else:
+            # Draw simplified nebulae as colored circles when zoomed out (always visible)
+            for nebula in self.nebulae:
+                nx, ny = nebula.center_position
+                nebula_size = nebula.size
+                if (nx + nebula_size > start_x and nx - nebula_size < end_x and
+                    ny + nebula_size > start_y and ny - nebula_size < end_y):
+                    scaled_grid_size = max(1, round(GRID_SIZE * self.zoom_level))
+                    center_x = nx * scaled_grid_size + self.offset_x
+                    center_y = ny * scaled_grid_size + self.offset_y
+                    
+                    # Ensure nebulae are always visible with minimum radius
+                    if self.zoom_level <= 0.05:
+                        radius = max(6, int(nebula_size * 0.5))  # Larger minimum for extreme zoom
+                    else:
+                        radius = max(3, int(nebula_size * self.zoom_level))
+                    # Draw simple colored circle
+                    color = nebula.base_color[:3]  # Remove alpha
+                    pygame.draw.circle(screen, color, (int(center_x), int(center_y)), radius)
+        
+        # Draw asteroids (only if visible, fixed to grid positions)
+        scaled_grid_size = max(1, round(GRID_SIZE * self.zoom_level))
         for asteroid in self.asteroids:
             ax, ay = asteroid['position']
             if (start_x <= ax < end_x and start_y <= ay < end_y):
-                scaled_grid_size = round(GRID_SIZE * self.zoom_level)
-                rect = pygame.Rect(ax * scaled_grid_size + self.offset_x, ay * scaled_grid_size + self.offset_y, scaled_grid_size, scaled_grid_size)
-                pygame.draw.rect(screen, (120, 120, 120), rect)  # Gray asteroids
-                pygame.draw.rect(screen, (80, 80, 80), rect, max(1, scaled_grid_size // 10))  # Darker border
+                # Calculate screen position using integer grid coordinates
+                screen_x = int(ax * scaled_grid_size + self.offset_x)
+                screen_y = int(ay * scaled_grid_size + self.offset_y)
+                
+                # Draw asteroid as a small gray circle
+                asteroid_size = max(2, int(3 * self.zoom_level))  # Scale size with zoom but keep minimum
+                pygame.draw.circle(screen, (150, 150, 150), (screen_x + scaled_grid_size//2, screen_y + scaled_grid_size//2), asteroid_size)
         
         # Draw tooltip only for selected unit
         if self.selected_unit and hasattr(self.selected_unit, 'render_tooltip'):
