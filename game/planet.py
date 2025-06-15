@@ -2,6 +2,7 @@ import pygame
 import numpy as np
 from .unit import Unit
 from .constants import *
+from .shipyard import ShipyardMixin
 
 PLANET_TYPES = {
     'ROCKY': {'label': 'R', 'color': (139, 69, 19)},
@@ -54,9 +55,10 @@ SUN_TYPES = {
     'Q_STAR': {'label': 'Q*', 'color': (255, 200, 255), 'size': 2},         # Theoretical ultra-compact object
 }
 
-class Planet(Unit):
+class Planet(Unit, ShipyardMixin):
     def __init__(self, planet_type, grid_position, size=3, system_label=None):
-        super().__init__('PLANET', grid_position, size=size)
+        Unit.__init__(self, 'PLANET', grid_position, size=size)
+        ShipyardMixin.__init__(self)
         self.planet_type = planet_type
         self.resources = self._generate_resources()
         self.show_tooltip = False
@@ -100,17 +102,17 @@ class Planet(Unit):
         # Only draw buildings when zoomed in enough to see them
         if zoom_level > 0.25 and scaled_grid_size > 8:
             # Draw buildings on the grid (colored by type)
-        from .constants import BUILDING_COLORS
-        for gy in range(self.size):
-            for gx in range(self.size):
-                cell = self.planet_grid[gy][gx]
-                if cell is not None:
-                    btype = cell.get('type', None)
-                    color = BUILDING_COLORS.get(btype, (0, 120, 255))
-                    cell_x = (self.grid_position[0] + gx) * scaled_grid_size + offset_x
-                    cell_y = (self.grid_position[1] + gy) * scaled_grid_size + offset_y
-                    rect = pygame.Rect(cell_x, cell_y, scaled_grid_size, scaled_grid_size)
-                    pygame.draw.rect(screen, color, rect.inflate(-scaled_grid_size//3, -scaled_grid_size//3))
+            from .constants import BUILDING_COLORS
+            for gy in range(self.size):
+                for gx in range(self.size):
+                    cell = self.planet_grid[gy][gx]
+                    if cell is not None:
+                        btype = cell.get('type', None)
+                        color = BUILDING_COLORS.get(btype, (0, 120, 255))
+                        cell_x = (self.grid_position[0] + gx) * scaled_grid_size + offset_x
+                        cell_y = (self.grid_position[1] + gy) * scaled_grid_size + offset_y
+                        rect = pygame.Rect(cell_x, cell_y, scaled_grid_size, scaled_grid_size)
+                        pygame.draw.rect(screen, color, rect.inflate(-scaled_grid_size//3, -scaled_grid_size//3))
         elif zoom_level > 0.1:
             # When moderately zoomed out, just show a dot if planet has any buildings
             has_buildings = any(cell is not None for row in self.planet_grid for cell in row)
@@ -243,7 +245,12 @@ class Planet(Unit):
             level_text = level_font.render(str(building['level']), True, WHITE)
             screen.blit(level_text, (building_rect.centerx - 5, building_rect.centery - 5))
 
-    def render_tooltip(self, screen, offset_x=0, offset_y=0):
+    def render_tooltip(self, screen, offset_x=0, offset_y=0, mouse_pos=None):
+        # If this planet has a shipyard, use the shipyard tooltip
+        if self.has_shipyard():
+            return self.render_shipyard_tooltip(screen, offset_x, offset_y, mouse_pos)
+        
+        # Otherwise, use the regular planet tooltip
         font = pygame.font.Font(None, 18)
         lines = [
             f"{self.system_label}-{self.type_label} ({self.planet_type.title()})",
@@ -282,6 +289,8 @@ class Planet(Unit):
         for i, line in enumerate(lines):
             text = font.render(line, True, (255, 255, 255))
             screen.blit(text, (tooltip_rect.x + 6, tooltip_rect.y + 4 + i * 22))
+        
+        return None  # No interactive buttons for regular planets
 
 class Sun(Planet):
     def __init__(self, sun_type, grid_position, system_label):
@@ -351,18 +360,18 @@ class Sun(Planet):
             
         else:
             # Draw single star normally
-        rect = pygame.Rect(px, py, scaled_size, scaled_size)
-        pygame.draw.rect(screen, self.color, rect)
-        border_color = tuple(max(0, c - 60) for c in self.color)
+            rect = pygame.Rect(px, py, scaled_size, scaled_size)
+            pygame.draw.rect(screen, self.color, rect)
+            border_color = tuple(max(0, c - 60) for c in self.color)
             pygame.draw.rect(screen, border_color, rect, max(1, scaled_size // 10))
         
         # Only draw label when zoomed in enough to read it
         if zoom_level > 0.1:
             font = pygame.font.Font(None, max(12, scaled_size // 2))
-        label_text = font.render(f"{self.system_label}-{self.type_label}", True, (255, 255, 255))
-        screen.blit(label_text, (px + 2, py + 2))
+            label_text = font.render(f"{self.system_label}-{self.type_label}", True, (255, 255, 255))
+            screen.blit(label_text, (px + 2, py + 2))
 
-    def render_tooltip(self, screen, offset_x=0, offset_y=0):
+    def render_tooltip(self, screen, offset_x=0, offset_y=0, mouse_pos=None):
         font = pygame.font.Font(None, 18)
         lines = [
             f"{self.system_label}-{self.type_label} ({self.sun_type_name})",

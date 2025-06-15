@@ -190,4 +190,148 @@ PLANET_BUILDING_RESTRICTIONS = {
     'TOXIC': ['Research Lab', 'Defense Platform', 'Research Station'],  # Harsh environment, limited options
 }
 
+# Orbital types
+ORBITAL_TYPES = {
+    'NEBULA_RESEARCH_STATION': 'Nebula Research Station',
+    'ORBITAL_SHIPYARD': 'Orbital Shipyard',
+    'DEEP_SPACE_FORTRESS': 'Deep Space Fortress'
+}
+
+# Orbital costs
+ORBITAL_COSTS = {
+    'Nebula Research Station': {
+        RESOURCE_TYPES['MINERALS']: 300,
+        RESOURCE_TYPES['ENERGY']: 200,
+        RESOURCE_TYPES['SCIENCE']: 150
+    },
+    'Orbital Shipyard': {
+        RESOURCE_TYPES['MINERALS']: 400,
+        RESOURCE_TYPES['ENERGY']: 300,
+        RESOURCE_TYPES['SCIENCE']: 100
+    },
+    'Deep Space Fortress': {
+        RESOURCE_TYPES['MINERALS']: 500,
+        RESOURCE_TYPES['ENERGY']: 400,
+        RESOURCE_TYPES['SCIENCE']: 50
+    }
+}
+
+# Orbital resource production per turn
+ORBITAL_PRODUCTION = {
+    'Nebula Research Station': {
+        'Science': 15
+    },
+    'Orbital Shipyard': {
+        'Minerals': 8,
+        'Energy': 5
+    },
+    'Deep Space Fortress': {
+        'Energy': 10
+    }
+}
+
+# Orbital colors
+ORBITAL_COLORS = {
+    'Nebula Research Station': (0, 255, 255),    # Cyan
+    'Orbital Shipyard': (255, 165, 0),          # Orange
+    'Deep Space Fortress': (255, 0, 0)          # Red
+}
+
+# Orbital menu labels
+BUILD_MENU_TABS = [
+    'Buildings',
+    'Orbitals'
+]
+
+# Ship types available for construction
+SHIP_TYPES = {
+    'CORVETTE': 'Corvette',
+    'FRIGATE': 'Frigate', 
+    'DESTROYER': 'Destroyer',
+    'CRUISER': 'Cruiser',
+    'BATTLESHIP': 'Battleship',
+    'CARRIER': 'Carrier',
+    'FIGHTER': 'Fighter',
+    'BOMBER': 'Bomber',
+    'SCOUT': 'Scout',
+    'TRANSPORT': 'Transport',
+    'BUILDER': 'Builder',
+    'COLONIZER': 'Colonizer'
+}
+
+# Ship construction costs
+SHIP_COSTS = {
+    'Corvette': {
+        'Minerals': 80,
+        'Energy': 40
+    },
+    'Frigate': {
+        'Minerals': 120,
+        'Energy': 60
+    },
+    'Destroyer': {
+        'Minerals': 180,
+        'Energy': 90,
+        'Science': 30
+    },
+    'Cruiser': {
+        'Minerals': 250,
+        'Energy': 120,
+        'Science': 50
+    },
+    'Battleship': {
+        'Minerals': 400,
+        'Energy': 200,
+        'Science': 100
+    },
+    'Carrier': {
+        'Minerals': 350,
+        'Energy': 180,
+        'Science': 80
+    },
+    'Fighter': {
+        'Minerals': 40,
+        'Energy': 20
+    },
+    'Bomber': {
+        'Minerals': 60,
+        'Energy': 30
+    },
+    'Scout': {
+        'Minerals': 50,
+        'Energy': 25
+    },
+    'Transport': {
+        'Minerals': 100,
+        'Energy': 50
+    },
+    'Builder': {
+        'Minerals': 120,
+        'Energy': 60,
+        'Science': 20
+    },
+    'Colonizer': {
+        'Minerals': 200,
+        'Energy': 100,
+        'Science': 40,
+        'Food': 50
+    }
+}
+
+# Ship construction time (in turns)
+SHIP_BUILD_TIME = {
+    'Corvette': 2,
+    'Frigate': 3,
+    'Destroyer': 4,
+    'Cruiser': 5,
+    'Battleship': 8,
+    'Carrier': 7,
+    'Fighter': 1,
+    'Bomber': 1,
+    'Scout': 1,
+    'Transport': 2,
+    'Builder': 3,
+    'Colonizer': 4
+}
+
  

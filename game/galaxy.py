@@ -1,9 +1,11 @@
 import pygame
 import numpy as np
+import random
 from .constants import *
 from .planet import Planet, Sun, PLANET_TYPES, SUN_TYPES
 from .unit import Ship, Frigate, Destroyer, Cruiser, Battleship, Carrier, Fighter, Bomber, BuilderShip, Corvette
 from .nebula import Nebula
+from .orbital import Orbital
 
 class Galaxy:
     def __init__(self):
@@ -18,12 +20,18 @@ class Galaxy:
         self.planets = []  # List of all planets
         self.asteroids = []  # List of all asteroids
         self.nebulae = []  # List of all nebulae
+        self.orbitals = []  # List of all orbital structures
 
         self.pan_speed = 20  # Speed for panning
         self.zoom_level = 1.0  # Initial zoom level
         self.build_mode = False
         self.build_warning = None  # Store warning message for UI
         self.building_just_placed = False  # Track if a building was just placed
+        self.orbital_just_placed = False  # Track if an orbital was just placed
+        
+        # Shipyard interaction tracking
+        self.current_shipyard_buttons = None
+        self.current_shipyard_object = None
         self.generate_planets()
         self.generate_asteroids()
         self.generate_nebulae()
@@ -82,7 +90,7 @@ class Galaxy:
                         planet = Planet(planet_type, (x, y), size=planet_size, system_label=system_label)
                         self.planets.append(planet)
                         break
-            system_index += 1
+                system_index += 1
 
         # Randomly generate the rest of the systems
         num_systems = np.random.randint(8, 15)  # More systems for denser galaxy
@@ -121,6 +129,8 @@ class Galaxy:
                                 break
                     system_index += 1
                     break  # Sun placed, move to next system
+                else:
+                    pass
 
         print(f"Total planets generated: {len(self.planets)}")
         print(f"Sun positions: {sun_positions}")
@@ -378,15 +388,28 @@ class Galaxy:
         # Player 2 BuilderShip
         self.ships.append(BuilderShip((GALAXY_SIZE-1, GALAXY_SIZE-1), owner=1))
 
-    def handle_click(self, pos, current_player):
+    def handle_click(self, pos, player, player_id):
         from .constants import GRID_SIZE
+        
+        # Check for shipyard button clicks first (highest priority)
+        if (self.current_shipyard_buttons and self.current_shipyard_object and 
+            hasattr(self.current_shipyard_object, 'handle_shipyard_click')):
+            # player is now the actual player object
+            handled, message = self.current_shipyard_object.handle_shipyard_click(pos, self.current_shipyard_buttons, player)
+            if handled:
+                if message:
+                    self.build_warning = message
+                    print(f"Shipyard action: {message}")
+                return
+        
         self.building_just_placed = False  # Reset flag at start of each click
+        self.orbital_just_placed = False  # Reset orbital flag at start of each click
         scaled_grid_size = max(1, round(GRID_SIZE * self.zoom_level))  # Prevent division by zero
-        grid_x = (pos[0] - self.offset_x) // scaled_grid_size
-        grid_y = (pos[1] - self.offset_y) // scaled_grid_size
+        grid_x = int((pos[0] - self.offset_x) // scaled_grid_size)
+        grid_y = int((pos[1] - self.offset_y) // scaled_grid_size)
         selected_building_type = getattr(self, 'selected_building_type', None)
         
-        print(f"Clicked grid: ({grid_x}, {grid_y}), current_player: {current_player}")
+        print(f"Clicked grid: ({grid_x}, {grid_y}), current_player: {player_id}")
         print("Ships:")
         for ship in self.ships:
             print(f"  {ship.label} at {ship.grid_position}, owner: {ship.owner}")
@@ -396,17 +419,18 @@ class Galaxy:
             print(f"DEBUG: move_tiles={self.move_tiles}, clicked=({grid_x}, {grid_y})")
         
         # --- LOGIC ORDER ---
-        # 1. Ship selection (highest priority)
+        # 1. Ship selection (highest priority - unless explicitly in build mode)
         # 2. Ship movement (if selected and click is in move_tiles)
         # 3. Planet clicks (selection or building placement)
-        # 4. Deselect if nothing found
+        # 4. Orbital placement (only if in build mode with building selected)
+        # 5. Deselect if nothing found
         
         # Find clicked ship
         clicked_ship = None
         for ship in self.ships:
             if ship.grid_position[0] == grid_x and ship.grid_position[1] == grid_y:
                 clicked_ship = ship
-                print(f"Clicked ship found: {ship.label} at {ship.grid_position}, owner: {ship.owner}, current_player: {current_player}")
+                print(f"Clicked ship found: {ship.label} at {ship.grid_position}, owner: {ship.owner}, current_player: {player_id}")
                 break
         
         # Find clicked planet
@@ -414,20 +438,31 @@ class Galaxy:
         for planet in self.planets:
             px, py = planet.grid_position
             if px <= grid_x < px + planet.size and py <= grid_y < py + planet.size:
-                clicked_planet = planet
-                print(f"Clicked planet found: {getattr(planet, 'system_label', '?')}-{getattr(planet, 'type_label', '?')} at {planet.grid_position} (size {planet.size})")
-                break
+                        clicked_planet = planet
+                        print(f"Clicked planet found: {getattr(planet, 'system_label', '?')}-{getattr(planet, 'type_label', '?')} at {planet.grid_position} (size {planet.size})")
+                        break
         
         # 1. Ship selection (HIGHEST PRIORITY)
         if clicked_ship:
-            if clicked_ship.owner == current_player:
+            if clicked_ship.owner == player_id:
                 print(f"Selecting ship: {clicked_ship.label}")
                 # Clear previous selections
                 for s in self.ships:
                     s.set_selected(False)
                 for p in self.planets:
                     p.selected = False
+                for o in self.orbitals:
+                    o.selected = False
                 
+                # Clear shipyard buttons when selection changes
+                self.current_shipyard_buttons = None
+                self.current_shipyard_object = None
+                
+                # Clear build mode and selected building when selecting ships
+                self.build_mode = False
+                self.selected_building_type = None
+                
+                # Set the selected unit and mark ship as selected
                 self.selected_unit = clicked_ship
                 clicked_ship.set_selected(True)
                 
@@ -439,10 +474,9 @@ class Galaxy:
                     self.move_tiles = []  # No movement allowed
                     print(f"DEBUG: {clicked_ship.label} has no actions left ({getattr(clicked_ship, 'actions_left', 'N/A')})")
                 
-                self.build_mode = False  # Not in build mode for ships
                 return
             else:
-                print(f"Cannot select {clicked_ship.label} - owned by player {clicked_ship.owner}, current player is {current_player}")
+                print(f"Cannot select {clicked_ship.label} - owned by player {clicked_ship.owner}, current player is {player_id}")
                 return
         
         # 2. Ship movement (if ship is selected and click is in move tiles)
@@ -512,7 +546,7 @@ class Galaxy:
                 # Require builder ship within 6 grids
                 builder_in_range = False
                 for ship in self.ships:
-                    if ship.unit_type == 'SHIP' and getattr(ship, 'label', None) == 'BLD' and ship.owner == current_player:
+                    if ship.unit_type == 'SHIP' and getattr(ship, 'label', None) == 'BLD' and ship.owner == player_id:
                         sx, sy = ship.grid_position
                         distance = abs(sx - px) + abs(sy - py)
                         if distance <= 6:
@@ -526,7 +560,7 @@ class Galaxy:
                 
                 self.build_warning = None
                 
-                if clicked_planet.can_build(current_player):
+                if clicked_planet.can_build(player_id):
                     # Check if building type is allowed on this planet
                     if not clicked_planet.can_build_type(selected_building_type):
                         self.build_warning = f'{selected_building_type} cannot be built on {clicked_planet.planet_type.title()} planets!'
@@ -534,13 +568,13 @@ class Galaxy:
                         return  # Don't reselect planet, just show warning
                     
                     # Try to place the building
-                    if clicked_planet.place_building(grid_cell_x, grid_cell_y, current_player, selected_building_type):
-                        print(f"Building placed at ({grid_cell_x}, {grid_cell_y}) for player {current_player} type {selected_building_type}")
+                    if clicked_planet.place_building(grid_cell_x, grid_cell_y, player_id, selected_building_type):
+                        print(f"Building placed at ({grid_cell_x}, {grid_cell_y}) for player {player_id} type {selected_building_type}")
                         self.building_just_placed = True  # Mark that a building was successfully placed
                         # Assign planet ownership if not already owned
                         if not hasattr(clicked_planet, 'owner') or clicked_planet.owner is None:
-                            clicked_planet.owner = current_player
-                            print(f"Planet {clicked_planet.system_label}-{clicked_planet.type_label} now owned by player {current_player}")
+                            clicked_planet.owner = player_id
+                            print(f"Planet {clicked_planet.system_label}-{clicked_planet.type_label} now owned by player {player_id}")
                         return  # Building placed successfully, don't reselect
                     else:
                         # Building placement failed (probably clicked on occupied cell)
@@ -564,22 +598,118 @@ class Galaxy:
                 self.selected_unit = clicked_planet
                 clicked_planet.selected = True
                 self.move_tiles = []
-                # Enter build mode if buildable, else just show tooltip
-                if hasattr(clicked_planet, 'can_build') and clicked_planet.can_build(current_player) and getattr(clicked_planet, 'planet_type', None) != 'SUN':
-                    self.build_mode = True
-                    print(f"DEBUG: Entering build mode for planet {getattr(clicked_planet, 'system_label', '?')}-{getattr(clicked_planet, 'type_label', '?')}")
-                else:
-                    self.build_mode = False
-                    print(f"DEBUG: Cannot build on planet {getattr(clicked_planet, 'system_label', '?')}-{getattr(clicked_planet, 'type_label', '?')} (can_build={hasattr(clicked_planet, 'can_build') and clicked_planet.can_build(current_player)}, planet_type={getattr(clicked_planet, 'planet_type', None)})")
+                # Don't automatically enter build mode - only show tooltip
+                self.build_mode = False
+                print(f"DEBUG: Planet selected: {getattr(clicked_planet, 'system_label', '?')}-{getattr(clicked_planet, 'type_label', '?')} (tooltip only)")
                 return
         
-        # 4. Deselect if nothing found (only if we didn't click on anything valid)
+        # 4. Handle orbital clicks (selection or placement)
+        clicked_orbital = None
+        for orbital in self.orbitals:
+            ox, oy = orbital.grid_position
+            if (grid_x >= ox and grid_x < ox + orbital.size and
+                grid_y >= oy and grid_y < oy + orbital.size):
+                clicked_orbital = orbital
+                print(f"Clicked orbital found: {orbital.name} at {orbital.grid_position}")
+                break
+            
+        if clicked_orbital:
+            if clicked_orbital.owner == player_id:
+                print(f"Selecting orbital: {clicked_orbital.name}")
+                # Clear previous selections
+                for s in self.ships:
+                    s.set_selected(False)
+                for p in self.planets:
+                    p.selected = False
+                for o in self.orbitals:
+                    o.selected = False
+                
+                self.selected_unit = clicked_orbital
+                clicked_orbital.selected = True
+                self.move_tiles = []
+                self.build_mode = False
+                return
+            else:
+                print(f"Cannot select {clicked_orbital.name} - owned by player {clicked_orbital.owner}")
+                return
+        
+        # 5. Handle orbital placement in empty space (only if in build mode)
+        if self.build_mode and selected_building_type and selected_building_type in ORBITAL_TYPES.values():
+            # Double-check affordability before placing orbital
+            from .constants import ORBITAL_COSTS
+            if selected_building_type in ORBITAL_COSTS:
+                costs = ORBITAL_COSTS[selected_building_type]
+                can_afford = True
+                for resource, amount in costs.items():
+                    if player.get_resource(resource) < amount:
+                        can_afford = False
+                        self.build_warning = f'Not enough {resource}! Need {amount}, have {player.get_resource(resource)}'
+                        print(f"DEBUG: Galaxy-level affordability check failed for {selected_building_type}")
+                        return
+                
+                if not can_afford:
+                    print(f"DEBUG: Galaxy-level affordability check failed for {selected_building_type}")
+                    return
+            # Check if we have a builder ship within range
+            builder_in_range = False
+            for ship in self.ships:
+                if ship.unit_type == 'SHIP' and getattr(ship, 'label', None) == 'BLD' and ship.owner == player_id:
+                    sx, sy = ship.grid_position
+                    distance = abs(sx - grid_x) + abs(sy - grid_y)
+                    if distance <= 8:  # Longer range for orbital construction
+                        builder_in_range = True
+                        break
+            
+            if not builder_in_range:
+                self.build_warning = 'A builder ship must be within 8 grids to build orbital structures!'
+                print(f"DEBUG: No builder in range for orbital at {grid_x}, {grid_y}")
+                return
+            
+            self.build_warning = None
+            
+            # Find the orbital type key from the display name
+            orbital_type_key = None
+            for key, display_name in ORBITAL_TYPES.items():
+                if display_name == selected_building_type:
+                    orbital_type_key = key
+                    break
+            
+            if orbital_type_key:
+                # Create a temporary orbital to test placement
+                temp_orbital = Orbital(orbital_type_key, (grid_x, grid_y), player_id)
+                
+                if temp_orbital.can_be_placed_at(self, grid_x, grid_y):
+                    # Place the orbital
+                    new_orbital = Orbital(orbital_type_key, (grid_x, grid_y), player_id)
+                    self.orbitals.append(new_orbital)
+                    self.orbital_just_placed = True  # Mark that an orbital was successfully placed
+                    print(f"Orbital {selected_building_type} placed at ({grid_x}, {grid_y}) for player {player_id}")
+                    return
+                else:
+                    # Check specific placement restrictions and give helpful error messages
+                    if orbital_type_key == 'NEBULA_RESEARCH_STATION':
+                        self.build_warning = 'Nebula Research Station must be placed within 5 grids of a nebula!'
+                    elif orbital_type_key == 'ORBITAL_SHIPYARD':
+                        self.build_warning = 'Orbital Shipyard must be placed 8-15 grids from a planet!'
+                    elif orbital_type_key == 'DEEP_SPACE_FORTRESS':
+                        self.build_warning = 'Deep Space Fortress must be placed away from planets, nebulae, and other orbitals!'
+                    else:
+                        self.build_warning = f'Cannot place {selected_building_type} here!'
+                    print(f"DEBUG: Orbital placement failed at ({grid_x}, {grid_y})")
+                    return
+            else:
+                print(f"ERROR: Could not find orbital type for {selected_building_type}")
+                return
+        
+        # 6. Deselect if nothing found (only if we didn't click on anything valid)
         print("Deselecting unit.")
         # Clear previous selections
         for s in self.ships:
             s.set_selected(False)
         for p in self.planets:
             p.selected = False
+        for o in self.orbitals:
+            o.selected = False
         self.build_mode = False  # Exit build mode on deselect
         self.selected_unit = None
         self.build_warning = None
@@ -724,6 +854,8 @@ class Galaxy:
         if keys[pygame.K_HOME] or keys[pygame.K_c]:
             # Press HOME or C to center view on galaxy
             self.center_view_on_galaxy()
+        
+        # Shipyard updates are now handled only in end_turn_update() method
 
     def render(self, screen):
         # Calculate visible grid range using dynamic screen dimensions
@@ -818,7 +950,6 @@ class Galaxy:
                 if x >= 0:  # Don't show negative coordinates
                     label = font.render(str(x), True, (200, 200, 200))
                     px = x * scaled_grid_size + self.offset_x
-                    screen_width = screen.get_width()
                     if px >= 0 and px < screen_width - 50:  # Only show if on screen
                         screen.blit(label, (px + 2, 2))
             # Left edge (y labels)
@@ -826,11 +957,21 @@ class Galaxy:
                 if y >= 0:  # Don't show negative coordinates
                     label = font.render(str(y), True, (200, 200, 200))
                     py = y * scaled_grid_size + self.offset_y
-                    screen_height = screen.get_height()
                     if py >= 0 and py < screen_height - 30:  # Only show if on screen
                         screen.blit(label, (2, py + 2))
 
+        # Set .selected for all planets and ships
+        for planet in self.planets:
+            planet.set_selected(planet is self.selected_unit)
+        for ship in self.ships:
+            ship.set_selected(ship is self.selected_unit)
+
         # Draw move range tiles (only if visible)
+        # Ensure move_tiles is updated for selected ship
+        if self.selected_unit and getattr(self.selected_unit, 'unit_type', None) == 'SHIP':
+            self.move_tiles = self.get_move_tiles(self.selected_unit)
+        else:
+            self.move_tiles = []
         for tile in self.move_tiles:
             tx, ty = tile
             if start_x <= tx < end_x and start_y <= ty < end_y:
@@ -844,35 +985,57 @@ class Galaxy:
             if (px + planet.size > start_x and px < end_x and
                 py + planet.size > start_y and py < end_y):
                 planet.render(screen, self.offset_x, self.offset_y, self.zoom_level)
+                # Show tooltip for selected planet
+                if planet is self.selected_unit and hasattr(planet, 'render_tooltip'):
+                    scaled_grid_size = round(GRID_SIZE * self.zoom_level)
+                    tooltip_offset_x = (planet.grid_position[0] + planet.size) * scaled_grid_size + self.offset_x + 8
+                    tooltip_offset_y = planet.grid_position[1] * scaled_grid_size + self.offset_y
+                    mouse_pos = pygame.mouse.get_pos()
+                    ship_buttons = planet.render_tooltip(screen, tooltip_offset_x, tooltip_offset_y, mouse_pos)
+                    # Store shipyard buttons for click handling
+                    if ship_buttons:
+                        self.current_shipyard_buttons = ship_buttons
+                        self.current_shipyard_object = planet
                 
-                # Only show detailed UI elements when zoomed in enough
-                if self.zoom_level > 0.3:
-                    # Only show tooltip if planet is specifically selected (not just in build mode)
-                    if (getattr(planet, 'selected', False) and hasattr(planet, 'render_tooltip')):
-                        # Tooltip always to the right of the planet grid
-                        scaled_grid_size = round(GRID_SIZE * self.zoom_level)
-                        tooltip_offset_x = (planet.grid_position[0] + planet.size) * scaled_grid_size + self.offset_x + 8
-                        tooltip_offset_y = planet.grid_position[1] * scaled_grid_size + self.offset_y
-                        planet.render_tooltip(screen, tooltip_offset_x, tooltip_offset_y)
-                    
-                    # Draw grid overlay if selected and not a sun
-                    if getattr(planet, 'selected', False) and getattr(planet, 'planet_type', None) != 'SUN':
-                        scaled_grid_size = round(GRID_SIZE * self.zoom_level)
-                        for gx in range(planet.size):
-                            for gy in range(planet.size):
-                                cell_x = (planet.grid_position[0] + gx) * scaled_grid_size + self.offset_x
-                                cell_y = (planet.grid_position[1] + gy) * scaled_grid_size + self.offset_y
-                                rect = pygame.Rect(cell_x, cell_y, scaled_grid_size, scaled_grid_size)
-                                pygame.draw.rect(screen, (0, 255, 0), rect, 2)
-                                # Draw building icon if present
-                                if planet.planet_grid[gy][gx] is not None:
-                                    pygame.draw.rect(screen, (0, 120, 255), rect.inflate(-scaled_grid_size//3, -scaled_grid_size//3))
+                # Draw grid overlay if selected and not a sun
+                if getattr(planet, 'selected', False) and getattr(planet, 'planet_type', None) != 'SUN':
+                    scaled_grid_size = round(GRID_SIZE * self.zoom_level)
+                    for gx in range(planet.size):
+                        for gy in range(planet.size):
+                            cell_x = (planet.grid_position[0] + gx) * scaled_grid_size + self.offset_x
+                            cell_y = (planet.grid_position[1] + gy) * scaled_grid_size + self.offset_y
+                            rect = pygame.Rect(cell_x, cell_y, scaled_grid_size, scaled_grid_size)
+                            pygame.draw.rect(screen, (0, 255, 0), rect, 2)
+                            # Draw building icon if present
+                            if planet.planet_grid[gy][gx] is not None:
+                                pygame.draw.rect(screen, (0, 120, 255), rect.inflate(-scaled_grid_size//3, -scaled_grid_size//3))
+        
+        # Draw orbitals (only if visible)
+        for orbital in self.orbitals:
+            ox, oy = orbital.grid_position
+            if (ox + orbital.size > start_x and ox < end_x and
+                oy + orbital.size > start_y and oy < end_y):
+                orbital.render(screen, self.offset_x, self.offset_y, self.zoom_level)
+                # Show tooltip for selected orbital
+                if orbital is self.selected_unit and hasattr(orbital, 'render_tooltip'):
+                    scaled_grid_size = round(GRID_SIZE * self.zoom_level)
+                    tooltip_offset_x = (orbital.grid_position[0] + orbital.size) * scaled_grid_size + self.offset_x + 8
+                    tooltip_offset_y = orbital.grid_position[1] * scaled_grid_size + self.offset_y
+                    mouse_pos = pygame.mouse.get_pos()
+                    ship_buttons = orbital.render_tooltip(screen, tooltip_offset_x, tooltip_offset_y, mouse_pos)
+                    # Store shipyard buttons for click handling
+                    if ship_buttons:
+                        self.current_shipyard_buttons = ship_buttons
+                        self.current_shipyard_object = orbital
         
         # Draw ships (only if visible)
         for ship in self.ships:
             sx, sy = ship.grid_position
             if (start_x <= sx < end_x and start_y <= sy < end_y):
                 ship.render(screen, self.offset_x, self.offset_y, self.zoom_level)
+                # Show tooltip for selected ship
+                if ship is self.selected_unit and hasattr(ship, 'render_tooltip'):
+                    ship.render_tooltip(screen, self.offset_x, self.offset_y, self.zoom_level)
         
         # Draw nebulae (in background, only if visible, optimized for zoom level)
         if self.zoom_level > 0.15:
@@ -916,8 +1079,11 @@ class Galaxy:
                 asteroid_size = max(2, int(3 * self.zoom_level))  # Scale size with zoom but keep minimum
                 pygame.draw.circle(screen, (150, 150, 150), (screen_x + scaled_grid_size//2, screen_y + scaled_grid_size//2), asteroid_size)
         
-        # Draw tooltip only for selected unit
-        if self.selected_unit and hasattr(self.selected_unit, 'render_tooltip'):
+        # Draw tooltip only for selected unit (but not ships/planets/orbitals, they're handled above)
+        if (self.selected_unit and hasattr(self.selected_unit, 'render_tooltip') and 
+            self.selected_unit not in self.ships and 
+            self.selected_unit not in self.planets and 
+            self.selected_unit not in self.orbitals):
             self.selected_unit.render_tooltip(screen, self.offset_x, self.offset_y)
 
         # Draw debug markers for all suns
@@ -935,8 +1101,72 @@ class Galaxy:
             s.set_selected(False)
         for p in self.planets:
             p.selected = False
+        for o in self.orbitals:
+            o.selected = False
         self.build_mode = False  # Exit build mode on deselect
         self.selected_unit = None
+        self.selected_building_type = None  # Clear selected building
         self.build_warning = None
         print("Deselecting unit (right click).")
         self.move_tiles = []
+
+    def is_position_empty(self, position):
+        """Check if a position is empty (no ships, planets, or orbitals)"""
+        x, y = position
+        
+        # Check bounds
+        if x < 0 or y < 0 or x >= GALAXY_SIZE or y >= GALAXY_SIZE:
+            return False
+        
+        # Check for ships
+        for ship in self.ships:
+            if ship.grid_position == (x, y):
+                return False
+        
+        # Check for planets
+        for planet in self.planets:
+            px, py = planet.grid_position
+            if (x >= px and x < px + planet.size and
+                y >= py and y < py + planet.size):
+                return False
+        
+        # Check for orbitals
+        for orbital in self.orbitals:
+            ox, oy = orbital.grid_position
+            if (x >= ox and x < ox + orbital.size and
+                y >= oy and y < oy + orbital.size):
+                return False
+        
+        return True
+
+    def get_planet_at_screen_pos(self, pos):
+        """Return the planet at the given screen position, or None if none."""
+        mouse_x, mouse_y = pos
+        for planet in self.planets:
+            # Calculate planet's screen position and size
+            scaled_grid_size = max(1, round(GRID_SIZE * self.zoom_level))
+            px = planet.grid_position[0] * scaled_grid_size + self.offset_x
+            py = planet.grid_position[1] * scaled_grid_size + self.offset_y
+            size = max(4, int(planet.size * scaled_grid_size))
+            rect = pygame.Rect(px, py, size, size)
+            if rect.collidepoint(mouse_x, mouse_y):
+                return planet
+        return None
+
+    def end_turn_update(self):
+        """Called at the end of each turn to update shipyard construction"""
+        print("=== TURN UPDATE: Processing Shipyards ===")
+        
+        # Update shipyards on planets
+        for planet in self.planets:
+            if hasattr(planet, 'update_shipyard') and planet.build_queue:
+                print(f"Updating shipyard on planet {getattr(planet, 'system_label', '?')}-{getattr(planet, 'type_label', '?')}")
+                planet.update_shipyard(self)
+        
+        # Update shipyards on orbitals
+        for orbital in self.orbitals:
+            if hasattr(orbital, 'update_shipyard') and orbital.build_queue:
+                print(f"Updating orbital shipyard: {orbital.name}")
+                orbital.update_shipyard(self)
+        
+        print("=== SHIPYARD UPDATE COMPLETE ===")
