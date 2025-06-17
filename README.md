@@ -1,5 +1,7 @@
 # Galactic Conquest - 4X Strategy Game
 
+RECODE i might rebuild from the ground up the way this game was build was very stange and unintutive and adding more depth for ships its gonna have most of the same base features and ships and everything just more deapth more intuitve and just better
+
 ## Current Status: ✅ WORKING VERSION
 
 This commit represents a fully functional 4X strategy game with all core systems operational.
